@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Controle de Jornada - Cootravale</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .pulse-ring {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulse-red 2s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+        @keyframes pulse-red {
+            to { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+        }
+
+        /* Fonte Mono para números não "pularem" */
+        .font-mono-nums { font-variant-numeric: tabular-nums; }
+
+        * { -webkit-tap-highlight-color: transparent; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased h-screen flex flex-col overflow-hidden">
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-slate-800 text-white px-6 py-3 rounded-full shadow-lg text-sm font-medium transition-all duration-300 opacity-0 translate-y-[-20px] pointer-events-none flex items-center gap-2 w-max max-w-[90%]">
+        <span id="toast-icon"></span>
+        <span id="toast-message" class="truncate">Mensagem</span>
+    </div>
+
+    <!-- AUTH SCREEN -->
+    <div id="login-screen" class="flex-1 flex flex-col justify-center p-6 fade-in hidden overflow-y-auto">
+        <div class="w-full max-w-sm mx-auto my-auto">
+            <div class="text-center mb-6">
+                <div class="bg-blue-600 w-16 h-16 rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
+                    <i data-lucide="truck" class="text-white w-8 h-8"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-800">Cootravale Driver</h1>
+                <p id="auth-subtitle" class="text-slate-500 text-sm mt-1">Gestão de jornada simplificada</p>
+            </div>
+
+            <!-- TABS -->
+            <div class="flex bg-slate-200 p-1 rounded-xl mb-6">
+                <button onclick="toggleAuthMode('login')" id="tab-login" class="flex-1 py-2.5 text-sm font-semibold rounded-lg bg-white shadow-sm text-slate-800 transition-all">Entrar</button>
+                <button onclick="toggleAuthMode('register')" id="tab-register" class="flex-1 py-2.5 text-sm font-medium text-slate-500 rounded-lg hover:text-slate-800 transition-all">Criar Conta</button>
+            </div>
+
+            <form id="auth-form" class="space-y-4">
+                
+                <div id="register-fields" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Nome Completo</label>
+                        <div class="relative">
+                            <i data-lucide="user" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
+                            <input type="text" id="full_name" placeholder="Ex: João da Silva" 
+                                class="w-full pl-10 pr-4 py-3.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                            >
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">CPF</label>
+                        <div class="relative">
+                            <i data-lucide="badge-id" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
+                            <input type="tel" id="cpf_register" placeholder="000.000.000-00" 
+                                class="w-full pl-10 pr-4 py-3.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">E-mail</label>
+                    <div class="relative">
+                        <i data-lucide="mail" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
+                        <input type="email" id="email" required placeholder="seu.email@exemplo.com" 
+                            class="w-full pl-10 pr-4 py-3.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        >
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Senha</label>
+                    <div class="relative">
+                        <i data-lucide="lock" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
+                        <input type="password" id="password" required placeholder="Senha segura" 
+                            class="w-full pl-10 pr-4 py-3.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                        >
+                    </div>
+                    <div id="forgot-link" class="text-right mt-2">
+                        <button type="button" onclick="handleResetPassword()" class="text-xs text-blue-600 hover:text-blue-800 font-bold py-1 px-2 -mr-2">
+                            Esqueci minha senha
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-4 pb-6">
+                    <button type="button" onclick="handleSubmit()" id="btn-submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg py-4 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95 flex justify-center items-center gap-2">
+                        <span>Acessar Conta</span>
+                        <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- DASHBOARD SCREEN -->
+    <div id="dashboard-screen" class="hidden flex-col h-full bg-slate-50">
+        
+        <!-- Header -->
+        <header class="bg-white px-5 py-4 shadow-sm flex justify-between items-center z-20 relative">
+            <div>
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Motorista</p>
+                <h2 id="user-display" class="text-base font-bold text-slate-800 max-w-[200px] truncate leading-tight">...</h2>
+            </div>
+            <button onclick="handleLogout()" class="text-slate-400 hover:text-red-500 p-2.5 -mr-2 rounded-full hover:bg-red-50 transition-colors">
+                <i data-lucide="log-out" class="w-5 h-5"></i>
+            </button>
+        </header>
+
+        <!-- Scrollable Content -->
+        <main class="flex-1 flex flex-col p-5 overflow-y-auto">
+            
+            <!-- NOVO CARD DE STATUS (SIMPLIFICADO) -->
+            <div id="status-card" class="rounded-3xl p-6 shadow-sm mb-8 text-center transition-all duration-300 bg-white border border-slate-100">
+                <p id="status-label" class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-2">Status Atual</p>
+                
+                <div class="flex justify-center mb-2">
+                    <div id="status-pill" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-500">
+                        <div class="w-2 h-2 rounded-full bg-current"></div>
+                        <span id="status-text" class="text-xs font-bold uppercase tracking-wide">CARREGANDO...</span>
+                    </div>
+                </div>
+                
+                <div class="font-mono-nums">
+                    <!-- Cronômetro Grande -->
+                    <p id="timer-display" class="text-5xl font-bold tracking-tight leading-none mb-1 text-slate-800">--:--:--</p>
+                    <p id="since-display" class="text-xs font-medium opacity-50">--</p>
+                </div>
+            </div>
+
+            <!-- Big Action Button -->
+            <div class="flex flex-col items-center gap-5 mb-10">
+                <button id="main-btn" onclick="toggleJourney()" class="group relative w-56 h-56 rounded-full flex flex-col items-center justify-center transition-all duration-300 shadow-xl active:scale-95 bg-slate-200 text-slate-400 select-none -my-2 border-4 border-slate-50">
+                    <!-- Icon Container -->
+                    <div class="mb-2 transition-transform duration-300 group-hover:scale-110">
+                        <i id="btn-icon" data-lucide="power" class="w-20 h-20 stroke-[1.5]"></i>
+                    </div>
+                    <span id="btn-text" class="text-xl font-black tracking-tight">CARREGANDO</span>
+                </button>
+
+                <p class="text-xs text-slate-400 text-center max-w-[220px] leading-relaxed">
+                    Toque no botão para alterar seu status.
+                </p>
+            </div>
+
+            <!-- Undo Action -->
+            <div class="flex justify-center mb-8">
+                <button id="btn-undo" onclick="undoLastAction()" class="flex items-center gap-2 text-slate-500 bg-white border border-slate-200 px-5 py-2.5 rounded-full text-sm font-semibold shadow-sm hover:bg-slate-50 active:bg-slate-100 transition-all active:scale-95">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    Desfazer
+                </button>
+            </div>
+
+            <!-- History Section -->
+            <div class="flex-1">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 ml-1">
+                    Histórico Recente
+                </h3>
+                
+                <div id="history-list" class="space-y-4 pb-10">
+                    <div class="text-center py-6 text-slate-400 text-sm">Carregando histórico...</div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // --- CONFIGURAÇÃO ---
+        const SUPABASE_URL = 'https://wlfccthleqztbpoyyjrd.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_dMfVaL7NPRI4OnQXhsS1wA_47ufLjrv';
+        
+        let supabaseClient = null;
+        let authMode = 'login';
+        let timerInterval = null; 
+
+        // Elementos UI
+        const views = {
+            login: document.getElementById('login-screen'),
+            dashboard: document.getElementById('dashboard-screen')
+        };
+
+        // --- INICIALIZAÇÃO ---
+        window.addEventListener('load', () => {
+            lucide.createIcons();
+            initSupabase();
+        });
+
+        function initSupabase() {
+            if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+                showToast('Erro: Chaves não configuradas.', 'error');
+                return;
+            }
+            try {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                checkSession();
+            } catch (e) {
+                console.error(e);
+                showToast('Erro ao inicializar App.', 'error');
+            }
+        }
+
+        async function checkSession() {
+            if (!supabaseClient) return;
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session) {
+                    loadDashboard(session.user);
+                } else {
+                    showView('login');
+                }
+            } catch(e) {
+                showView('login');
+            }
+        }
+
+        // --- AUTH ---
+        function toggleAuthMode(mode) {
+            authMode = mode;
+            const tabLogin = document.getElementById('tab-login');
+            const tabRegister = document.getElementById('tab-register');
+            const registerFields = document.getElementById('register-fields');
+            const btnSubmit = document.getElementById('btn-submit');
+            const forgotLink = document.getElementById('forgot-link');
+            const subtitle = document.getElementById('auth-subtitle');
+
+            if (mode === 'login') {
+                tabLogin.className = "flex-1 py-2.5 text-sm font-semibold rounded-lg bg-white shadow-sm text-slate-800 transition-all";
+                tabRegister.className = "flex-1 py-2.5 text-sm font-medium text-slate-500 rounded-lg hover:text-slate-800 transition-all";
+                registerFields.classList.add('hidden');
+                forgotLink.classList.remove('hidden');
+                btnSubmit.innerHTML = `<span>Acessar Conta</span> <i data-lucide="arrow-right" class="w-5 h-5"></i>`;
+                subtitle.innerText = "Gestão de jornada simplificada";
+            } else {
+                tabLogin.className = "flex-1 py-2.5 text-sm font-medium text-slate-500 rounded-lg hover:text-slate-800 transition-all";
+                tabRegister.className = "flex-1 py-2.5 text-sm font-semibold rounded-lg bg-white shadow-sm text-slate-800 transition-all";
+                registerFields.classList.remove('hidden');
+                forgotLink.classList.add('hidden');
+                btnSubmit.innerHTML = `<span>Cadastrar Motorista</span> <i data-lucide="user-plus" class="w-5 h-5"></i>`;
+                subtitle.innerText = "Preencha seus dados para começar";
+            }
+            lucide.createIcons();
+        }
+
+        async function handleSubmit() {
+            if (authMode === 'login') handleLogin();
+            else handleRegister();
+        }
+
+        async function handleLogin() {
+            if (!supabaseClient) return;
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('btn-submit');
+
+            if (!email || !password) return showToast('Preencha E-mail e Senha', 'error');
+
+            setLoading(btn, true, 'Acessando...');
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            setLoading(btn, false, 'Acessar Conta');
+
+            if (error) showToast(translateAuthError(error.message), 'error');
+            else loadDashboard(data.user);
+        }
+
+        async function handleRegister() {
+            if (!supabaseClient) return;
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const fullName = document.getElementById('full_name').value.trim();
+            const cpf = document.getElementById('cpf_register').value.trim();
+            const btn = document.getElementById('btn-submit');
+            
+            if (!fullName || !cpf || !email || !password) return showToast('Preencha todos os campos', 'error');
+            
+            setLoading(btn, true, 'Cadastrando...');
+
+            try {
+                const { data, error } = await supabaseClient.auth.signUp({ 
+                    email, password, options: { data: { full_name: fullName, cpf: cpf } }
+                });
+
+                if (error) {
+                    showToast(translateAuthError(error.message), 'error');
+                    setLoading(btn, false, 'Cadastrar Motorista');
+                } else {
+                    if (data.session) {
+                        showToast('Conta criada!', 'success');
+                        loadDashboard(data.user);
+                    } else if (data.user) {
+                        setTimeout(async () => {
+                            const { data: loginData } = await supabaseClient.auth.signInWithPassword({ email, password });
+                            if (loginData.session) {
+                                showToast('Bem-vindo!', 'success');
+                                loadDashboard(loginData.user);
+                            } else {
+                                showToast('Verifique seu e-mail.', 'info');
+                                setLoading(btn, false, 'Cadastrar Motorista');
+                            }
+                        }, 1000);
+                    }
+                }
+            } catch (err) {
+                showToast('Erro inesperado.', 'error');
+                setLoading(btn, false, 'Cadastrar Motorista');
+            }
+        }
+
+        async function handleResetPassword() {
+            const email = document.getElementById('email').value.trim();
+            if (!email) return showToast('Digite seu e-mail para recuperar.', 'info');
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+            if (error) showToast(translateAuthError(error.message), 'error');
+            else showToast('Link enviado para o e-mail!', 'success');
+        }
+
+        function translateAuthError(msg) {
+            if(msg.includes("Email not confirmed")) return "E-mail não confirmado.";
+            if(msg.includes("User already registered")) return "E-mail já cadastrado.";
+            if(msg.includes("Invalid login")) return "Dados incorretos.";
+            return msg;
+        }
+
+        async function handleLogout() {
+            if(timerInterval) clearInterval(timerInterval);
+            await supabaseClient.auth.signOut();
+            showView('login');
+        }
+
+        // --- DASHBOARD LOGIC ---
+
+        async function loadDashboard(user) {
+            showView('dashboard');
+            document.getElementById('user-display').innerText = 'Carregando...';
+            refreshData();
+        }
+
+        async function refreshData() {
+            if (!supabaseClient) return;
+            const { data, error } = await supabaseClient.rpc('get_dashboard_data');
+            if (error) return console.error(error);
+            updateUI(data);
+        }
+
+        async function toggleJourney() {
+            if (!supabaseClient) return;
+            const btn = document.getElementById('main-btn');
+            btn.classList.add('opacity-50', 'pointer-events-none');
+            const { data, error } = await supabaseClient.rpc('toggle_journey');
+            btn.classList.remove('opacity-50', 'pointer-events-none');
+
+            if (error) showToast('Erro ao registrar.', 'error');
+            else {
+                showToast(data.action === 'START' ? 'Jornada Iniciada!' : 'Jornada Encerrada!', 'success');
+                refreshData();
+            }
+        }
+
+        async function undoLastAction() {
+            const btnUndo = document.getElementById('btn-undo');
+            if (btnUndo.innerText.includes("Confirmar?")) {
+                btnUndo.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Processando...';
+                const { data, error } = await supabaseClient.rpc('undo_last_entry');
+                if (error || data.status === 'error') showToast('Erro ao desfazer.', 'error');
+                else {
+                    showToast('Desfeito com sucesso.', 'success');
+                    refreshData();
+                }
+                setTimeout(() => {
+                    btnUndo.innerHTML = '<i data-lucide="rotate-ccw" class="w-4 h-4"></i> Desfazer';
+                    lucide.createIcons();
+                }, 1000);
+            } else {
+                const originalText = btnUndo.innerHTML;
+                btnUndo.classList.add('bg-red-50', 'text-red-600', 'border-red-200');
+                btnUndo.innerText = "Confirmar?";
+                setTimeout(() => {
+                    btnUndo.classList.remove('bg-red-50', 'text-red-600', 'border-red-200');
+                    btnUndo.innerHTML = originalText;
+                    lucide.createIcons();
+                }, 3000);
+            }
+        }
+
+        // --- UI & TIMER ---
+
+        function startTimer(startTimeISO) {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            const timerEl = document.getElementById('timer-display');
+            
+            if (!startTimeISO) {
+                timerEl.innerText = "00:00:00";
+                return;
+            }
+
+            const startDate = new Date(startTimeISO).getTime();
+            if(isNaN(startDate)) {
+                timerEl.innerText = "00:00:00";
+                return;
+            }
+
+            function update() {
+                const now = new Date().getTime();
+                const diffMs = now - startDate;
+                
+                if (diffMs < 0) {
+                    timerEl.innerText = "00:00:00";
+                    return;
+                }
+
+                const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                const diffSecs = Math.floor((diffMs % (1000 * 60)) / 1000);
+                
+                timerEl.innerText = `${String(diffHrs).padStart(2, '0')}:${String(diffMins).padStart(2, '0')}:${String(diffSecs).padStart(2, '0')}`;
+            }
+
+            update(); 
+            timerInterval = setInterval(update, 1000); 
+        }
+
+        function updateUI(data) {
+            const btn = document.getElementById('main-btn');
+            const btnIcon = document.getElementById('btn-icon');
+            const btnText = document.getElementById('btn-text');
+            
+            // Novos elementos do Card
+            const statusCard = document.getElementById('status-card');
+            const statusPill = document.getElementById('status-pill');
+            const statusText = document.getElementById('status-text');
+            const timerDisplay = document.getElementById('timer-display');
+            const sinceDisplay = document.getElementById('since-display');
+            
+            const historyList = document.getElementById('history-list');
+            const userDisplay = document.getElementById('user-display');
+
+            if(data.full_name) userDisplay.innerText = data.full_name;
+
+            const isWorking = data.current_status === 'START';
+
+            // ATUALIZAÇÃO DO CARTÃO
+            if (isWorking) {
+                // Modo EM VIAGEM (Verde)
+                statusCard.className = "rounded-3xl p-6 shadow-xl mb-8 text-center transition-all duration-300 bg-green-500 text-white border-none transform scale-105";
+                statusPill.className = "inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white";
+                statusText.innerText = "EM VIAGEM";
+                timerDisplay.className = "text-6xl font-bold tracking-tighter leading-none mb-1 text-white drop-shadow-sm";
+                sinceDisplay.className = "text-sm font-medium opacity-90 text-green-100";
+                
+                // Botão Parar (Vermelho)
+                btn.className = "group relative w-56 h-56 rounded-full flex flex-col items-center justify-center transition-all duration-300 shadow-2xl active:scale-95 bg-red-500 text-white pulse-ring hover:bg-red-600 -my-2 border-8 border-white";
+                btnIcon.setAttribute('data-lucide', 'octagon');
+                btnText.innerText = "PARAR";
+
+            } else {
+                // Modo DESCANSO (Branco)
+                statusCard.className = "rounded-3xl p-6 shadow-sm mb-8 text-center transition-all duration-300 bg-white border border-slate-200";
+                statusPill.className = "inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-500";
+                statusText.innerText = "DESCANSANDO";
+                timerDisplay.className = "text-5xl font-bold tracking-tight leading-none mb-1 text-slate-800";
+                sinceDisplay.className = "text-xs font-medium opacity-50 text-slate-400";
+
+                // Botão Iniciar (Verde)
+                btn.className = "group relative w-56 h-56 rounded-full flex flex-col items-center justify-center transition-all duration-300 shadow-2xl active:scale-95 bg-green-500 text-white hover:bg-green-600 shadow-green-200 -my-2 border-8 border-white";
+                btnIcon.setAttribute('data-lucide', 'play');
+                btnText.innerText = "INICIAR";
+            }
+
+            // Timer
+            if (data.last_time) {
+                const date = new Date(data.last_time);
+                sinceDisplay.innerText = "Desde às " + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                startTimer(data.last_time);
+            } else {
+                sinceDisplay.innerText = "Nenhum registro";
+                startTimer(null);
+            }
+
+            // Histórico
+            historyList.innerHTML = '';
+            if (data.history.length === 0) {
+                historyList.innerHTML = '<div class="text-center py-6 text-slate-400 text-sm">Nenhum registro recente</div>';
+            } else {
+                let lastDate = null;
+
+                data.history.forEach(item => {
+                    const isStart = item.entry_type === 'START';
+                    const dateObj = new Date(item.created_at);
+                    
+                    const today = new Date().toLocaleDateString('pt-BR');
+                    const itemDate = dateObj.toLocaleDateString('pt-BR');
+                    let headerLabel = (itemDate === today) ? "Hoje" : itemDate;
+                    
+                    if (itemDate !== lastDate) {
+                        const header = document.createElement('div');
+                        header.className = "flex items-center gap-2 mt-6 first:mt-0 mb-3";
+                        header.innerHTML = `
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">${headerLabel}</span>
+                            <div class="h-px bg-slate-100 flex-1"></div>
+                        `;
+                        historyList.appendChild(header);
+                        lastDate = itemDate;
+                    }
+
+                    const timeStr = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+                    const div = document.createElement('div');
+                    div.className = "bg-white p-4 rounded-xl border border-slate-100 flex justify-between items-center shadow-sm relative overflow-hidden";
+                    div.innerHTML = `
+                        <div class="absolute left-0 top-0 bottom-0 w-1 ${isStart ? 'bg-green-500' : 'bg-red-400'}"></div>
+                        <div class="flex items-center gap-3 pl-2">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center ${isStart ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}">
+                                <i data-lucide="${isStart ? 'play' : 'square'}" class="w-3.5 h-3.5 fill-current"></i>
+                            </div>
+                            <div>
+                                <p class="font-bold text-slate-700 text-sm leading-none mb-1">${isStart ? 'Início de Viagem' : 'Fim de Viagem'}</p>
+                            </div>
+                        </div>
+                        <span class="font-mono text-slate-500 font-bold text-sm bg-slate-50 px-2 py-1 rounded-md border border-slate-100">${timeStr}</span>
+                    `;
+                    historyList.appendChild(div);
+                });
+            }
+
+            lucide.createIcons();
+        }
+
+        function showView(viewName) {
+            views.login.classList.add('hidden');
+            views.dashboard.classList.add('hidden');
+            views[viewName].classList.remove('hidden');
+            views[viewName].classList.add('flex');
+        }
+
+        function showToast(msg, type = 'info') {
+            const toastEl = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-message');
+            const iconEl = document.getElementById('toast-icon');
+
+            msgEl.innerText = msg;
+            
+            if (type === 'success') iconEl.innerHTML = '<i data-lucide="check-circle" class="w-4 h-4 text-green-400"></i>';
+            else if (type === 'error') iconEl.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-red-400"></i>';
+            else iconEl.innerHTML = '<i data-lucide="info" class="w-4 h-4 text-blue-400"></i>';
+            
+            lucide.createIcons();
+            toastEl.style.opacity = '1';
+            toastEl.style.transform = 'translate(-50%, 0)';
+            setTimeout(() => {
+                toastEl.style.opacity = '0';
+                toastEl.style.transform = 'translate(-50%, -20px)';
+            }, 3000);
+        }
+
+        function setLoading(btn, isLoading, text = '') {
+            if(isLoading) {
+                btn.dataset.originalText = btn.innerHTML;
+                btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> ' + text;
+                btn.disabled = true;
+                btn.classList.add('opacity-70');
+            } else {
+                btn.innerHTML = btn.dataset.originalText;
+                btn.disabled = false;
+                btn.classList.remove('opacity-70');
+            }
+            lucide.createIcons();
+        }
+
+    </script>
+</body>
+</html>
